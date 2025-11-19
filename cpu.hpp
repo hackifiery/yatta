@@ -444,7 +444,23 @@ public:
     }
 };
 
-// Global definition used for printing in exec_prog (for debugging/trace)
+int run_prog(const vector<RawInstruction>& prog_raw) {
+    try {
+        Cpu x = Cpu(NUM_REGISTERS_SAMPLE, BUS_COUNT_SAMPLE);
+        vector<Instruction> x_decoded = decode_program(prog_raw);
+        x.exec_prog(x_decoded);
+    }
+    catch (const runtime_error& e) {
+        cerr << "Runtime Error: " << e.what() << endl;
+        return 1;
+    }
+    catch (const out_of_range& e) {
+        cerr << "Out of Range Error: " << e.what() << endl;
+        return 1;
+    }
+    return 0;
+}
+
 vector<RawInstruction> sample_program = {
     {"5", "A1", ""},        // 0: A1 = 5
     {"5", "A2", ""},        // 1: A2 = 5
@@ -459,19 +475,7 @@ vector<RawInstruction> sample_program = {
     {"30", "R3", "ZF == 0"}, // 10: R3 = 30 IF ZF is 0 (Should succeed)
 };
 
-int test() {
-    try {
-        Cpu x = Cpu(NUM_REGISTERS_SAMPLE, BUS_COUNT_SAMPLE);
-        vector<Instruction> x_decoded = decode_program(sample_program);
-        x.exec_prog(x_decoded);
-    }
-    catch (const runtime_error& e) {
-        cerr << "Runtime Error: " << e.what() << endl;
-        return 1;
-    }
-    catch (const out_of_range& e) {
-        cerr << "Out of Range Error: " << e.what() << endl;
-        return 1;
-    }
-    return 0;
+void test() {
+    run_prog(sample_program);
+    return;
 }

@@ -210,7 +210,6 @@ int Cpu::get_flag_value(const string& flag_name) const {
     throw runtime_error("Unknown flag name in condition: " + flag_name);
 }
 
-// --- NEW: Conditional Execution Check ---
 bool Cpu::check_condition(const Instruction& instr) {
     if (instr.comp.empty()) {
         return true; // No condition, always execute

@@ -16,7 +16,6 @@ using namespace std;
 constexpr int NUM_REGISTERS_SAMPLE = 8;
 constexpr int BUS_COUNT_SAMPLE = 1;
 
-// --- Moved to cpu.cpp: definitions ---
 // Declare globals as extern here; definitions live in cpu.cpp
 extern string ops_ordered[6];
 extern map<string, string> ops_map;

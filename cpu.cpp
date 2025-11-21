@@ -333,6 +333,7 @@ Cpu::Cpu(int reg, int bus_) {
 }
 
 int Cpu::exec_prog(const vector<Instruction>& prog) {
+    // DEBUG
     cout << "--- Starting TTA Simulation ---" << endl;
     while (pc >= 0 && pc < prog.size()) {
         const Instruction& instr = prog[pc];
@@ -388,6 +389,7 @@ void Cpu::print_register_file() {
 }
 
 int run_prog(const vector<RawInstruction>& prog_raw) {
+    // DEBUG
     try {
         Cpu x = Cpu(NUM_REGISTERS_SAMPLE, BUS_COUNT_SAMPLE);
         vector<Instruction> x_decoded = decode_program(prog_raw);

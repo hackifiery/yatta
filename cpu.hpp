@@ -48,7 +48,6 @@ private:
     int update_alu();
     int get_flag_value(const string& flag_name) const;
     bool check_condition(const Instruction& instr);
-    int exec_line(const Instruction& instr);
 
 public:
     bool increment_pc = true;
@@ -68,11 +67,13 @@ public:
     int reg_amount = 0, bus_amount = 0;
     Cpu(int reg, int bus_);
 
-    int exec_prog(const vector<Instruction>& prog);
+    int exec_prog(const vector<Instruction>& prog); // DEBUG
     void print_register_file();
+
+    int exec_line(const Instruction& instr);
 };
 
-int run_prog(const vector<RawInstruction>& prog_raw);
+int run_prog(const vector<RawInstruction>& prog_raw);// DEBUG
 
 extern vector<RawInstruction> sample_program;
 

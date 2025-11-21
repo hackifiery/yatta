@@ -9,5 +9,6 @@ public:
     Computer(int memory_size, int reg, int bus);
     vector<int> memory;
     Cpu cpu;
-    void load_program(const vector<RawInstruction>& prog_raw, int start_address);
+    void put_program(const vector<RawInstruction>& prog_raw, int start_address);
+    Instruction read_program(int start_address);
 };

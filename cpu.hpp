@@ -25,10 +25,16 @@ struct Instruction {
     int source_value = 0;
     int dest_type = 0;
     int dest_value = 0;
-    // Condition fields
-    std::string cond1 = ""; // Left-hand side (usually a flag name like "ZF")
-    std::string cond2 = ""; // Right-hand side (usually a constant like "1")
-    std::string comp  = ""; // Comparison type (e.g., "eq" for ==)
+    // Condition fields (fixed-size C-strings so Instruction is trivially copyable)
+    char cond1[8]; // Left-hand side (usually a flag name like "ZF")
+    char cond2[8]; // Right-hand side (usually a constant like "1")
+    char comp[8];  // Comparison type (e.g., "eq" for ==)
+
+    // NEW: typed condition operands (0=const,1=reg,2=alu,3=flag,4=pc)
+    int cond1_type = -1;
+    int cond1_value = 0;
+    int cond2_type = -1;
+    int cond2_value = 0;
 };
 
 struct RawInstruction {
@@ -46,8 +52,7 @@ private:
     bool check_add_overflow(int a, int b, int& result);
     bool check_mul_overflow(int a, int b, int& result);
     int update_alu();
-    int get_flag_value(const std::string& flag_name) const;
-    bool check_condition(const Instruction& instr);
+    int get_flag_value(const char* flag_name) const;
 
 public:
     int halted = 0;
@@ -70,6 +75,7 @@ public:
 
     int exec_prog(const std::vector<Instruction>& prog); // DEBUG
     void print_register_file();
+    bool check_condition(const Instruction& instr);
 
     int exec_line(const Instruction& instr);
 };

@@ -1,3 +1,6 @@
+#include <cstdint>
+#include <cstring>
+
 #include "cpu.hpp"
 
 using namespace std;
@@ -25,36 +28,76 @@ string trim(const string& str) {
 }
 
 Instruction convert_line(const RawInstruction& line_raw) {
-    Instruction prog = { 0, 0, 0, 0, "", "", "" }; // Initialize new condition fields
-    
+    Instruction prog = { 0, 0, 0, 0, {0}, {0}, {0}, -1,0,-1,0 }; // fixed-size C-strings zero-init + cond types
+
     // --- CONDITION PARSING ---
     if (!line_raw.condition.empty()) {
         string lhs, rhs, op;
         
-        // NOTE: Use the correctly ordered array (ops_ordered)
-        for (int i = 0; i < 6; ++i) { 
-            // Find the operator in the condition string
+        for (int i = 0; i < 6; ++i) {
             size_t pos = line_raw.condition.find(ops_ordered[i]);
-            
             if (pos != string::npos){
                 op = ops_ordered[i];
-                
-                // Extract LHS (substring from start up to the operator)
                 lhs = line_raw.condition.substr(0, pos);
-                
-                // Extract RHS (substring from after the operator to the end)
                 rhs = line_raw.condition.substr(pos + op.size());
-                
-                prog.cond1 = trim(lhs);
-                prog.cond2 = trim(rhs);
-                prog.comp = ops_map[op];
+                string lhs_trim = trim(lhs);
+                string rhs_trim = trim(rhs);
+                string comp_str = ops_map[op];
+                // copy into fixed-size fields (ensure null termination)
+                strncpy(prog.cond1, lhs_trim.c_str(), sizeof(prog.cond1)-1);
+                prog.cond1[sizeof(prog.cond1)-1] = '\0';
+                strncpy(prog.cond2, rhs_trim.c_str(), sizeof(prog.cond2)-1);
+                prog.cond2[sizeof(prog.cond2)-1] = '\0';
+                strncpy(prog.comp, comp_str.c_str(), sizeof(prog.comp)-1);
+                prog.comp[sizeof(prog.comp)-1] = '\0';
+
+                // Parse lhs and rhs into typed operands (reuse source parsing rules)
+                auto parse_operand = [&](const string& tok)->pair<int,int>{
+                    if (tok.empty()) throw runtime_error("empty condition operand");
+                    if (all_of(tok.begin(), tok.end(), ::isdigit)) {
+                        return {0, stoi(tok)}; // constant
+                    }
+                    if (tok == "PC") {
+                        return {4, 0};
+                    }
+                    if (tok[0] == 'R' && tok.size() > 1 && isdigit(tok[1])) {
+                        return {1, stoi(tok.substr(1))};
+                    }
+                    if (tok.size() > 1 && tok[1] == 'F') {
+                        int v = 0;
+                        switch(tok[0]) {
+                            case 'A': v = 1; break;
+                            case 'Z': v = 2; break;
+                            case 'N': v = 3; break;
+                            case 'O': v = 4; break;
+                            case 'H': v = 5; break;
+                            default: throw runtime_error("unknown flag symbol in condition: '" + tok + "'");
+                        }
+                        return {3, v};
+                    }
+                    if (tok[0] == 'A' && tok.size() > 1 && isdigit(tok[1])) {
+                        return {2, stoi(tok.substr(1))};
+                    }
+                    throw runtime_error("unknown token in condition: '" + tok + "'");
+                };
+
+                auto p1 = parse_operand(lhs_trim);
+                auto p2 = parse_operand(rhs_trim);
+                prog.cond1_type = p1.first;
+                prog.cond1_value = p1.second;
+                prog.cond2_type = p2.first;
+                prog.cond2_value = p2.second;
                 break;
             }
         }
-        // Handle case where condition is present but no known operator is found (optional error check)
-        if (op.empty()) {
+        if (prog.comp[0] == '\0') {
             throw runtime_error("Conditional statement '" + line_raw.condition + "' contains no valid comparison operator.");
         }
+    } else {
+        // no condition
+        prog.cond1_type = -1;
+        prog.cond2_type = -1;
+        prog.comp[0] = '\0';
     }
     
     // --- SOURCE PARSING ---
@@ -209,43 +252,56 @@ int Cpu::update_alu() {
     return 0;
 }
 
-int Cpu::get_flag_value(const string& flag_name) const {
-    if (flag_name == "ZF") return *alu_zf;
-    if (flag_name == "NF") return *alu_nf;
-    if (flag_name == "OF") return *alu_of;
-    // AF (ALU Trigger Flag) could also be checked, but usually ZF/NF/OF are the control flags
-    // For simplicity, we'll only allow ZF, NF, OF here.
-    throw runtime_error("Unknown flag name in condition: " + flag_name);
+int Cpu::get_flag_value(const char* flag_name) const {
+    if (flag_name == nullptr) throw runtime_error("Null flag name");
+    if (strcmp(flag_name, "ZF") == 0) return *alu_zf;
+    if (strcmp(flag_name, "NF") == 0) return *alu_nf;
+    if (strcmp(flag_name, "OF") == 0) return *alu_of;
+    // allow HF/AF if needed by caller (AF handled in source_type==3)
+    throw runtime_error(string("Unknown flag name in condition: ") + flag_name);
 }
 
 bool Cpu::check_condition(const Instruction& instr) {
-    if (instr.comp.empty()) {
+    if (instr.comp[0] == '\0' || instr.cond1_type == -1) {
         return true; // No condition, always execute
     }
-    
-    // 1. Get LHS (Flag Value)
-    int lhs_val = get_flag_value(instr.cond1);
-    
-    // 2. Get RHS (Expected Value - should be 0 or 1)
-    int rhs_val;
-    try {
-        rhs_val = stoi(instr.cond2);
-    } catch (...) {
-        throw runtime_error("Condition RHS must be a constant integer (0 or 1). Found: " + instr.cond2);
-    }
 
-    // 3. Evaluate comparison based on the operator string
-    if (instr.comp == "eq") return lhs_val == rhs_val;
-    if (instr.comp == "ne") return lhs_val != rhs_val;
-    
-    // For flags, LT/LE/GT/GE usually don't make sense, but we'll include them for completeness.
-    if (instr.comp == "lt") return lhs_val < rhs_val;
-    if (instr.comp == "le") return lhs_val <= rhs_val;
-    if (instr.comp == "gt") return lhs_val > rhs_val;
-    if (instr.comp == "ge") return lhs_val >= rhs_val;
-    
-    // Should not be reached if parser works correctly
-    return false; 
+    auto eval_operand = [&](int type, int val)->int {
+        switch(type) {
+            case 0: return val; // constant
+            case 1: // register
+                if (val < 0 || val >= reg_amount) throw runtime_error("Condition register index out of range");
+                return regs[val];
+            case 2: // ALU port
+                if (val < 0 || val > 2) throw runtime_error("Condition ALU index out of range");
+                return alu[val];
+            case 3: // flag
+                switch(val) {
+                    case 1: return alu_trigger;
+                    case 2: return *alu_zf;
+                    case 3: return *alu_nf;
+                    case 4: return *alu_of;
+                    case 5: return halted;
+                    default: throw runtime_error("Unknown flag index in condition: " + to_string(val));
+                }
+            case 4: // PC
+                return pc;
+            default:
+                throw runtime_error("Unknown condition operand type: " + to_string(type));
+        }
+    };
+
+    int lhs_val = eval_operand(instr.cond1_type, instr.cond1_value);
+    int rhs_val = eval_operand(instr.cond2_type, instr.cond2_value);
+
+    if (strcmp(instr.comp, "eq") == 0) return lhs_val == rhs_val;
+    if (strcmp(instr.comp, "ne") == 0) return lhs_val != rhs_val;
+    if (strcmp(instr.comp, "lt") == 0) return lhs_val < rhs_val;
+    if (strcmp(instr.comp, "le") == 0) return lhs_val <= rhs_val;
+    if (strcmp(instr.comp, "gt") == 0) return lhs_val > rhs_val;
+    if (strcmp(instr.comp, "ge") == 0) return lhs_val >= rhs_val;
+
+    return false;
 }
 
 int Cpu::exec_line(const Instruction& instr) {
@@ -358,7 +414,7 @@ int Cpu::exec_prog(const vector<Instruction>& prog) {
         bool execute = true;
 
         // --- NEW: Conditional Check Block ---
-        if (!instr.comp.empty()) {
+        if (!instr.comp[0] == '\0') {
             if (!check_condition(instr)) {
                 // Condition failed: skip execution
                 cout << "PC " << pc << ": Condition FAILED. Skipping." << endl;

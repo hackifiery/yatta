@@ -1,12 +1,15 @@
 #include "cpu.hpp"
 #include "computer.hpp"
+#include "shell.hpp"
+#include "converter.hpp"
 
 using namespace std;
 
-Computer c(128, NUM_REGISTERS_SAMPLE, BUS_COUNT_SAMPLE);
-
 int main(){
-    c.put_program(sample_program, 0);
+    // shell();
+    Computer c(64, 4, 1);
+    RawInstruction inst = parse_program_lines({"1 HF ? R1 == 0"})[0];
+    c.put_program({inst}, 0);
     c.run_from_ram(0);
     return 0;
 }
@@ -14,3 +17,5 @@ int main(){
 // Include implementation units so building only main.cpp provides all definitions
 #include "cpu.cpp"
 #include "computer.cpp"
+#include "shell.cpp"
+#include "converter.cpp"

@@ -1,0 +1,12 @@
+5 A1
+5 A2
+2 AF
+ZF R0
+5 PC ZF == 1
+10 R1 ZF == 0
+20 R2 ZF == 1
+R2 A1
+R2 A2
+1 AF
+30 R3 ZF == 0
+1 HF

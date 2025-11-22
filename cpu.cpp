@@ -298,7 +298,7 @@ void Cpu::print_register_file() {
     for (int i = 0; i < 3; ++i) {
         cout << " ALU" << i << "=" << alu[i];
     }
-    cout << endl << "ALU trigger: " << alu_trigger << " PC: " << pc << endl;
+        cout << endl << " PC: " << pc << endl;
     cout << "ALU flags: ZF=" << *alu_zf << " NF=" << *alu_nf << " OF=" << *alu_of;
     cout << endl << "Halted: " << halted;
     cout << "\n" << endl;

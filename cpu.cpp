@@ -1,5 +1,8 @@
 #include "cpu.hpp"
 
+using namespace std;
+
+
 // Definitions moved from header
 string ops_ordered[6] = {"==", "!=", "<=", ">=", "<", ">"};
 map<string, string> ops_map = {
@@ -420,21 +423,6 @@ int run_prog(const vector<RawInstruction>& prog_raw) {
     }
     return 0;
 }
-
-vector<RawInstruction> sample_program = {
-    {"5", "A1", ""},        // 0: A1 = 5
-    {"5", "A2", ""},        // 1: A2 = 5
-    {"2", "AF", ""},        // 2: AF = 2 (SUB trigger). ALU runs: A0 = 5 - 5 = 0. ZF=1.
-    {"ZF", "R0", ""},       // 3: R0 = ZF (1)
-    {"5", "PC", "ZF == 1"},// 4: JUMP to PC 5 IF ZF is 1 (Should succeed, but PC=100 is out of bounds)
-    {"10", "R1", "ZF == 0"}, // 5: R1 = 10 IF ZF is 0 (Should fail)
-    {"20", "R2", "ZF == 1"}, // 6: R2 = 20 IF ZF is 1 (Should succeed)
-    {"R2", "A1", ""},       // 7: A1 = R2 (20)
-    {"R2", "A2", ""},       // 8: A2 = R2 (20)
-    {"1", "AF", ""},        // 9: AF = 1 (ADD trigger). ALU runs: A0 = 40. ZF=0.
-    {"30", "R3", "ZF == 0"}, // 10: R3 = 30 IF ZF is 0 (Should succeed)
-    {"1", "HF", ""}         // 11: HF = 1 (Halt)
-};
 
 void test() {
     run_prog(sample_program);

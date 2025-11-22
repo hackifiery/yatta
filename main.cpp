@@ -3,7 +3,7 @@
 
 using namespace std;
 
-Computer c(1000000, NUM_REGISTERS_SAMPLE, BUS_COUNT_SAMPLE);
+Computer c(128, NUM_REGISTERS_SAMPLE, BUS_COUNT_SAMPLE);
 
 int main(){
     c.put_program(sample_program, 0);
@@ -11,7 +11,6 @@ int main(){
     return 0;
 }
 
-// Include implementation units so compiling only main.cpp supplies all definitions
+// Include implementation units so building only main.cpp provides all definitions
 #include "cpu.cpp"
 #include "computer.cpp"
-

@@ -8,52 +8,50 @@
 #include <algorithm>
 #include <limits>
 #include <map>
-#include <string>
-
-using namespace std;
 
 // --- Configuration ---
 constexpr int NUM_REGISTERS_SAMPLE = 8;
 constexpr int BUS_COUNT_SAMPLE = 1;
 
 // Declare globals as extern here; definitions live in cpu.cpp
-extern string ops_ordered[6];
-extern map<string, string> ops_map;
+extern std::string ops_ordered[6];
+extern std::map<std::string, std::string> ops_map;
 
 struct Instruction {
-    int source_type;
-    int source_value;
-    int dest_type;
-    int dest_value;
+    int source_type = 0;
+    int source_value = 0;
+    int dest_type = 0;
+    int dest_value = 0;
     // Condition fields
-    string cond1; // Left-hand side (usually a flag name like "ZF")
-    string cond2; // Right-hand side (usually a constant like "1")
-    string comp;  // Comparison type (e.g., "eq" for ==)
+    std::string cond1 = ""; // Left-hand side (usually a flag name like "ZF")
+    std::string cond2 = ""; // Right-hand side (usually a constant like "1")
+    std::string comp  = ""; // Comparison type (e.g., "eq" for ==)
 };
 
 struct RawInstruction {
-    string src;
-    string dest;
-    string condition;
+    std::string src;
+    std::string dest;
+    std::string condition;
 };
 
-string trim(const string& str);
+std::string trim(const std::string& str);
 Instruction convert_line(const RawInstruction& line_raw);
-vector<Instruction> decode_program(const vector<RawInstruction>& prog_raw);
+std::vector<Instruction> decode_program(const std::vector<RawInstruction>& prog_raw);
 
 class Cpu {
 private:
     bool check_add_overflow(int a, int b, int& result);
     bool check_mul_overflow(int a, int b, int& result);
     int update_alu();
-    int get_flag_value(const string& flag_name) const;
+    int get_flag_value(const std::string& flag_name) const;
     bool check_condition(const Instruction& instr);
 
 public:
+    int halted = 0;
     bool increment_pc = true;
     int pc = 0;
     
-    vector<unsigned int> regs, bus;
+    std::vector<unsigned int> regs, bus;
     int alu[3] = { 0,0,0 };
     int* alu_result = &alu[0]; 
     int* alu_op1 = &alu[1]; 
@@ -67,14 +65,14 @@ public:
     int reg_amount = 0, bus_amount = 0;
     Cpu(int reg, int bus_);
 
-    int exec_prog(const vector<Instruction>& prog); // DEBUG
+    int exec_prog(const std::vector<Instruction>& prog); // DEBUG
     void print_register_file();
 
     int exec_line(const Instruction& instr);
 };
 
-int run_prog(const vector<RawInstruction>& prog_raw);// DEBUG
+int run_prog(const std::vector<RawInstruction>& prog_raw);// DEBUG
 
-extern vector<RawInstruction> sample_program;
+extern std::vector<RawInstruction> sample_program;
 
 void test();

@@ -1,6 +1,5 @@
 #include <iostream>
 #include <vector>
-#include <cstring>
 #include <stdexcept>
 #include <cstdint>
 
@@ -13,7 +12,8 @@ Computer::Computer(int memory_size, int regs, int bus) : cpu(regs, bus) {
     // initialize member counts
     reg_num = regs;
     bus_num = bus;
-    memory.resize(memory_size, 0);
+    // memory holds Instruction slots now
+    memory.resize(static_cast<size_t>(memory_size)); 
 }
 
 void Computer::put_program(const vector<RawInstruction> &prog_raw, int start_address) {
@@ -25,32 +25,45 @@ void Computer::put_program(const vector<RawInstruction> &prog_raw, int start_add
     size_t prog_count = prog.size();
     if (prog_count == 0) return;
 
-    // Calculate sizes in bytes
-    size_t instr_size = sizeof(Instruction);
-    size_t mem_elem_size = sizeof(memory[0]);
-    size_t mem_bytes = memory.size() * mem_elem_size;
-    size_t required_bytes = static_cast<size_t>(start_address + prog_count) * instr_size;
-
-    if (required_bytes > mem_bytes) {
-        throw runtime_error("Not enough memory to load program at given start_address");
+    // bounds-check using instruction slots
+    if (static_cast<size_t>(start_address) + prog_count > memory.size()) {
+        throw runtime_error("Not enough memory (instruction slots) to load program at given start_address");
     }
 
-    // Copy each Instruction into the memory buffer at byte offsets.
-    // Use byte-level pointer to memory.data() so this works regardless of underlying element type.
-    char* mem_bytes_ptr = reinterpret_cast<char*>(memory.data());
+    // Copy Instructions into the instruction memory safely via assignment
     for (size_t i = 0; i < prog_count; ++i) {
-        memcpy(mem_bytes_ptr + (static_cast<size_t>(start_address) + i) * instr_size,
-               &prog[i],
-               instr_size);
+        memory[static_cast<size_t>(start_address) + i] = prog[i];
     }
 }
 
 Instruction Computer::read_program(int start_address) {
-    // only reads one line so we dont have to load the entire program into a buffer before executing it (we can just do so directly via the exec_line func)
-    const size_t instr_size = sizeof(Instruction);
-    uint8_t* mem_bytes_ptr = reinterpret_cast<uint8_t*>(memory.data());
-    Instruction inst;
-    memcpy(&inst, mem_bytes_ptr + static_cast<size_t>(start_address) * instr_size, instr_size);
-    cpu.exec_line(inst); // execute the instruction immediately after reading
+    // only reads one line
+    if (start_address < 0 || static_cast<size_t>(start_address) >= memory.size()) {
+        throw runtime_error("read_program: start_address out of range");
+    }
+    // Return the instruction without executing it (execution should be driven by run_from_ram)
+    Instruction inst = memory[static_cast<size_t>(start_address)];
     return inst;
+}
+
+void Computer::run_from_ram(int start_address) {
+    if (start_address < 0 || static_cast<size_t>(start_address) >= memory.size()) {
+        throw runtime_error("run_from_ram: start_address out of range");
+    }
+
+    // Initialize CPU PC to the start address and drive execution using cpu.pc
+    cpu.pc = start_address;
+    cpu.increment_pc = true;
+
+    while (!cpu.halted && cpu.pc >= 0 && static_cast<size_t>(cpu.pc) < memory.size()) {
+        Instruction& inst = memory[static_cast<size_t>(cpu.pc)];
+        cpu.exec_line(inst);
+
+        // PC increment logic mirrors Cpu::exec_prog behavior
+        if (cpu.increment_pc) {
+            cpu.pc++;
+        } else {
+            cpu.increment_pc = true; // reset flag after a successful jump
+        }
+    }
 }

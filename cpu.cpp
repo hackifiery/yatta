@@ -68,7 +68,7 @@ Instruction convert_line(const RawInstruction& line_raw) {
         prog.source_type = 1; // register
         prog.source_value = stoi(line_raw.src.substr(1));
     }
-    // #F (Flag: AF, ZF, NF, OF)
+    // #F (Flag: AF, ZF, NF, OF, HF)
     else if (line_raw.src.size() > 1 && line_raw.src[1] == 'F') { 
         prog.source_type = 3; // flag
         prog.source_value = 0;
@@ -77,6 +77,7 @@ Instruction convert_line(const RawInstruction& line_raw) {
             case 'Z': prog.source_value = 2; break; // zero flag
             case 'N': prog.source_value = 3; break; // neg flag
             case 'O': prog.source_value = 4; break; // overflow flag
+            case 'H': prog.source_value = 5; break; // halt flag
             default: throw runtime_error("unknown flag symbol '" + line_raw.src + "'");
         }
     }
@@ -97,6 +98,10 @@ Instruction convert_line(const RawInstruction& line_raw) {
     else if (line_raw.dest == "AF") { // Only AF can be a destination (to set the trigger)
         prog.dest_type = 3; // ALU flag (trigger)
         prog.dest_value = 1; // alu flag
+    }
+    else if (line_raw.dest == "HF") { // halt flag
+        prog.dest_type = 3; // ALU flag (trigger)
+        prog.dest_value = 5; // alu flag
     }
     else if (line_raw.dest[0] == 'R' && line_raw.dest.size() > 1 && isdigit(line_raw.dest[1])) {
         prog.dest_type = 1; // register
@@ -241,6 +246,9 @@ bool Cpu::check_condition(const Instruction& instr) {
 }
 
 int Cpu::exec_line(const Instruction& instr) {
+    if (halted) {
+        return 0; // CPU is halted; ignore instruction
+    }
     int src_val = 0;
     
     // Ensure any pending ALU op is complete before reading *any* source.
@@ -310,6 +318,11 @@ int Cpu::exec_line(const Instruction& instr) {
                 alu_trigger = src_val;
                 update_alu();
                 break;
+            case 5: // halt flag (HF)
+                if (src_val != 0) {
+                    halted = 1;
+                }
+                break;
             default:
                 throw runtime_error("Unknown or read-only flag destination value: " + to_string(instr.dest_value));
         }
@@ -322,6 +335,7 @@ int Cpu::exec_line(const Instruction& instr) {
     default:
         throw runtime_error("Unknown dest type: " + to_string(instr.dest_type));
     }
+    print_register_file();
     return 0;
 }
 
@@ -385,6 +399,7 @@ void Cpu::print_register_file() {
     }
     cout << endl << "ALU trigger: " << alu_trigger << " PC: " << pc << endl;
     cout << "ALU flags: ZF=" << *alu_zf << " NF=" << *alu_nf << " OF=" << *alu_of;
+    cout << endl << "Halted: " << halted;
     cout << "\n" << endl;
 }
 
@@ -418,6 +433,7 @@ vector<RawInstruction> sample_program = {
     {"R2", "A2", ""},       // 8: A2 = R2 (20)
     {"1", "AF", ""},        // 9: AF = 1 (ADD trigger). ALU runs: A0 = 40. ZF=0.
     {"30", "R3", "ZF == 0"}, // 10: R3 = 30 IF ZF is 0 (Should succeed)
+    {"1", "HF", ""}         // 11: HF = 1 (Halt)
 };
 
 void test() {

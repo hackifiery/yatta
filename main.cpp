@@ -3,11 +3,11 @@
 
 using namespace std;
 
-Computer c(1024, NUM_REGISTERS_SAMPLE, BUS_COUNT_SAMPLE);
+Computer c(1000000, NUM_REGISTERS_SAMPLE, BUS_COUNT_SAMPLE);
 
 int main(){
     c.put_program(sample_program, 0);
-    c.read_program(0);
+    c.run_from_ram(0);
     return 0;
 }
 

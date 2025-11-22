@@ -2,6 +2,8 @@
 #include <cstring>
 
 #include "cpu.hpp"
+#include "parser.hpp"
+#include "assembler.hpp"
 
 using namespace std;
 
@@ -16,168 +18,6 @@ map<string, string> ops_map = {
     {">", "gt"},
     {">=", "ge"}
 };
-
-
-string trim(const string& str) {
-    size_t first = str.find_first_not_of(" \t\n\r");
-    if (string::npos == first) {
-        return str;
-    }
-    size_t last = str.find_last_not_of(" \t\n\r");
-    return str.substr(first, (last - first + 1));
-}
-
-Instruction convert_line(const RawInstruction& line_raw) {
-    Instruction prog = { 0, 0, 0, 0, {0}, {0}, {0}, -1,0,-1,0 }; // fixed-size C-strings zero-init + cond types
-
-    // --- CONDITION PARSING ---
-    if (!line_raw.condition.empty()) {
-        string lhs, rhs, op;
-        
-        for (int i = 0; i < 6; ++i) {
-            size_t pos = line_raw.condition.find(ops_ordered[i]);
-            if (pos != string::npos){
-                op = ops_ordered[i];
-                lhs = line_raw.condition.substr(0, pos);
-                rhs = line_raw.condition.substr(pos + op.size());
-                string lhs_trim = trim(lhs);
-                string rhs_trim = trim(rhs);
-                string comp_str = ops_map[op];
-                // copy into fixed-size fields (ensure null termination)
-                strncpy(prog.cond1, lhs_trim.c_str(), sizeof(prog.cond1)-1);
-                prog.cond1[sizeof(prog.cond1)-1] = '\0';
-                strncpy(prog.cond2, rhs_trim.c_str(), sizeof(prog.cond2)-1);
-                prog.cond2[sizeof(prog.cond2)-1] = '\0';
-                strncpy(prog.comp, comp_str.c_str(), sizeof(prog.comp)-1);
-                prog.comp[sizeof(prog.comp)-1] = '\0';
-
-                // Parse lhs and rhs into typed operands (reuse source parsing rules)
-                auto parse_operand = [&](const string& tok)->pair<int,int>{
-                    if (tok.empty()) throw runtime_error("empty condition operand");
-                    if (all_of(tok.begin(), tok.end(), ::isdigit)) {
-                        return {0, stoi(tok)}; // constant
-                    }
-                    if (tok == "PC") {
-                        return {4, 0};
-                    }
-                    if (tok[0] == 'R' && tok.size() > 1 && isdigit(tok[1])) {
-                        return {1, stoi(tok.substr(1))};
-                    }
-                    if (tok.size() > 1 && tok[1] == 'F') {
-                        int v = 0;
-                        switch(tok[0]) {
-                            case 'A': v = 1; break;
-                            case 'Z': v = 2; break;
-                            case 'N': v = 3; break;
-                            case 'O': v = 4; break;
-                            case 'H': v = 5; break;
-                            default: throw runtime_error("unknown flag symbol in condition: '" + tok + "'");
-                        }
-                        return {3, v};
-                    }
-                    if (tok[0] == 'A' && tok.size() > 1 && isdigit(tok[1])) {
-                        return {2, stoi(tok.substr(1))};
-                    }
-                    throw runtime_error("unknown token in condition: '" + tok + "'");
-                };
-
-                auto p1 = parse_operand(lhs_trim);
-                auto p2 = parse_operand(rhs_trim);
-                prog.cond1_type = p1.first;
-                prog.cond1_value = p1.second;
-                prog.cond2_type = p2.first;
-                prog.cond2_value = p2.second;
-                break;
-            }
-        }
-        if (prog.comp[0] == '\0') {
-            throw runtime_error("Conditional statement '" + line_raw.condition + "' contains no valid comparison operator.");
-        }
-    } else {
-        // no condition
-        prog.cond1_type = -1;
-        prog.cond2_type = -1;
-        prog.comp[0] = '\0';
-    }
-    
-    // --- SOURCE PARSING ---
-    if (all_of(line_raw.src.begin(), line_raw.src.end(), ::isdigit) && !line_raw.src.empty()) {
-        prog.source_type = 0; // number
-        prog.source_value = stoi(line_raw.src);
-    }
-    else if (line_raw.src == "PC") {
-        prog.source_type = 4; // program counter
-        prog.source_value = 0;
-    }
-    // R# (Register)
-    else if (line_raw.src[0] == 'R' && line_raw.src.size() > 1 && isdigit(line_raw.src[1])) {
-        prog.source_type = 1; // register
-        prog.source_value = stoi(line_raw.src.substr(1));
-    }
-    // #F (Flag: AF, ZF, NF, OF, HF)
-    else if (line_raw.src.size() > 1 && line_raw.src[1] == 'F') { 
-        prog.source_type = 3; // flag
-        prog.source_value = 0;
-        switch(line_raw.src[0]) {
-            case 'A': prog.source_value = 1; break; // alu flag (trigger state)
-            case 'Z': prog.source_value = 2; break; // zero flag
-            case 'N': prog.source_value = 3; break; // neg flag
-            case 'O': prog.source_value = 4; break; // overflow flag
-            case 'H': prog.source_value = 5; break; // halt flag
-            default: throw runtime_error("unknown flag symbol '" + line_raw.src + "'");
-        }
-    }
-    // A# (ALU port)
-    else if (line_raw.src[0] == 'A' && line_raw.src.size() > 1 && isdigit(line_raw.src[1])) {
-        prog.source_type = 2; // ALU port
-        prog.source_value = stoi(line_raw.src.substr(1));
-    }
-    else {
-        throw runtime_error("unknown symbol '" + line_raw.src + "' in source");
-    }
-
-    // --- DESTINATION PARSING ---
-    if (line_raw.dest == "PC") {
-        prog.dest_type = 4; // program counter
-        prog.dest_value = 0;
-    }
-    else if (line_raw.dest == "AF") { // Only AF can be a destination (to set the trigger)
-        prog.dest_type = 3; // ALU flag (trigger)
-        prog.dest_value = 1; // alu flag
-    }
-    else if (line_raw.dest == "HF") { // halt flag
-        prog.dest_type = 3; // ALU flag (trigger)
-        prog.dest_value = 5; // alu flag
-    }
-    else if (line_raw.dest[0] == 'R' && line_raw.dest.size() > 1 && isdigit(line_raw.dest[1])) {
-        prog.dest_type = 1; // register
-        prog.dest_value = stoi(line_raw.dest.substr(1));
-    }
-    else if (line_raw.dest[0] == 'A' && line_raw.dest.size() > 1 && isdigit(line_raw.dest[1])) {
-        prog.dest_type = 2; // ALU port
-        prog.dest_value = stoi(line_raw.dest.substr(1));
-    }
-    else if (all_of(line_raw.dest.begin(), line_raw.dest.end(), ::isdigit) && !line_raw.dest.empty()) {
-        prog.dest_type = 0; // Discard/NOP
-        prog.dest_value = 0;
-    }
-    else {
-        throw runtime_error("unknown symbol '" + line_raw.dest + "' in destination");
-    }
-
-    return prog;
-}
-vector<Instruction> decode_program(const vector<RawInstruction>& prog_raw) {
-    vector<Instruction> prog_decoded;
-    prog_decoded.reserve(prog_raw.size()); 
-
-    for (const auto& raw_instr : prog_raw) {
-        prog_decoded.push_back(convert_line(raw_instr));
-    }
-
-    return prog_decoded;
-}
-
 
 // Cpu method definitions
 
@@ -262,27 +102,29 @@ int Cpu::get_flag_value(const char* flag_name) const {
 }
 
 bool Cpu::check_condition(const Instruction& instr) {
-    if (instr.comp[0] == '\0' || instr.cond1_type == -1) {
+    if (instr.comp[0] == '\0') {
         return true; // No condition, always execute
     }
-
-    auto eval_operand = [&](int type, int val)->int {
+    // Compute operand values from declared types and numeric condition values stored in Instruction.
+    auto compute_value = [&](int type, int value)->int {
+        if (type == -1) throw runtime_error("Missing condition operand type; machine-code must declare types");
         switch(type) {
-            case 0: return val; // constant
+            case 0: // constant
+                return value;
             case 1: // register
-                if (val < 0 || val >= reg_amount) throw runtime_error("Condition register index out of range");
-                return regs[val];
+                if (value < 0 || value >= reg_amount) throw runtime_error("Condition register index out of range");
+                return regs[value];
             case 2: // ALU port
-                if (val < 0 || val > 2) throw runtime_error("Condition ALU index out of range");
-                return alu[val];
+                if (value < 0 || value > 2) throw runtime_error("Condition ALU index out of range");
+                return alu[value];
             case 3: // flag
-                switch(val) {
+                switch(value) {
                     case 1: return alu_trigger;
                     case 2: return *alu_zf;
                     case 3: return *alu_nf;
                     case 4: return *alu_of;
                     case 5: return halted;
-                    default: throw runtime_error("Unknown flag index in condition: " + to_string(val));
+                    default: throw runtime_error("Invalid flag code in condition: " + to_string(value));
                 }
             case 4: // PC
                 return pc;
@@ -291,8 +133,8 @@ bool Cpu::check_condition(const Instruction& instr) {
         }
     };
 
-    int lhs_val = eval_operand(instr.cond1_type, instr.cond1_value);
-    int rhs_val = eval_operand(instr.cond2_type, instr.cond2_value);
+    int lhs_val = compute_value(instr.cond1_type, instr.cond1_value);
+    int rhs_val = compute_value(instr.cond2_type, instr.cond2_value);
 
     if (strcmp(instr.comp, "eq") == 0) return lhs_val == rhs_val;
     if (strcmp(instr.comp, "ne") == 0) return lhs_val != rhs_val;
@@ -408,13 +250,13 @@ Cpu::Cpu(int reg, int bus_) {
 int Cpu::exec_prog(const vector<Instruction>& prog) {
     // DEBUG
     cout << "--- Starting TTA Simulation ---" << endl;
-    while (pc >= 0 && pc < prog.size()) {
+    while (pc >= 0 && pc < static_cast<int>(prog.size())) {
         const Instruction& instr = prog[pc];
         
         bool execute = true;
 
-        // --- NEW: Conditional Check Block ---
-        if (!instr.comp[0] == '\0') {
+        // Conditional Check Block
+        if (instr.comp[0] != '\0') {
             if (!check_condition(instr)) {
                 // Condition failed: skip execution
                 cout << "PC " << pc << ": Condition FAILED. Skipping." << endl;
@@ -438,7 +280,7 @@ int Cpu::exec_prog(const vector<Instruction>& prog) {
         }
 
         // Ensure we don’t read past program memory (important after jumps)
-        if (pc >= prog.size()) break;
+        if (pc >= static_cast<int>(prog.size())) break;
         
         print_register_file(); // Print state after every cycle
     }
@@ -466,7 +308,11 @@ int run_prog(const vector<RawInstruction>& prog_raw) {
     // DEBUG
     try {
         Cpu x = Cpu(NUM_REGISTERS_SAMPLE, BUS_COUNT_SAMPLE);
-        vector<Instruction> x_decoded = decode_program(prog_raw);
+        // decode_program returns vector<string> (machine-code lines)
+        vector<string> encoded = decode_program(prog_raw);
+        vector<Instruction> x_decoded;
+        x_decoded.reserve(encoded.size());
+        for (const auto &s : encoded) x_decoded.push_back(string_to_instr(s));
         x.exec_prog(x_decoded);
     }
     catch (const runtime_error& e) {
@@ -481,6 +327,26 @@ int run_prog(const vector<RawInstruction>& prog_raw) {
 }
 
 void test() {
-    run_prog(sample_program);
+    // Build program as assembly lines (human readable)
+    std::vector<std::string> asm_lines = {
+        "5 A1",
+        "5 A2",
+        "2 AF",
+        "ZF R0",
+        "5 PC ZF == 1",
+        "10 R1 ZF == 0",
+        "20 R2 ZF == 1",
+        "R2 A1",
+        "R2 A2",
+        "1 AF",
+        "30 R3 ZF == 0",
+        "1 HF"
+    };
+
+    // Parse assembly into RawInstruction vector
+    auto prog_raw = parse_program_lines(asm_lines);
+
+    // Run program (parse->encode->decode pipeline happens inside run_prog)
+    run_prog(prog_raw);
     return;
 }

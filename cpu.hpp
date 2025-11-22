@@ -30,10 +30,11 @@ struct Instruction {
     char cond2[8]; // Right-hand side (usually a constant like "1")
     char comp[8];  // Comparison type (e.g., "eq" for ==)
 
-    // NEW: typed condition operands (0=const,1=reg,2=alu,3=flag,4=pc)
+    // typed condition operands (0=const,1=reg,2=alu,3=flag,4=pc)
     int cond1_type = -1;
-    int cond1_value = 0;
     int cond2_type = -1;
+    // numeric values for the typed condition operands (mirror source_value/dest_value)
+    int cond1_value = 0;
     int cond2_value = 0;
 };
 
@@ -42,10 +43,6 @@ struct RawInstruction {
     std::string dest;
     std::string condition;
 };
-
-std::string trim(const std::string& str);
-Instruction convert_line(const RawInstruction& line_raw);
-std::vector<Instruction> decode_program(const std::vector<RawInstruction>& prog_raw);
 
 class Cpu {
 private:

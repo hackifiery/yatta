@@ -12,6 +12,8 @@ public:
     std::vector<uint8_t> memory; // now a raw byte buffer
     Cpu cpu;
     void put_program(const std::vector<RawInstruction>& prog_raw, int start_address);
+    // Overload: accept already-decoded machine instructions
+    void put_program(const std::vector<Instruction>& prog, int start_address);
     Instruction read_program(int start_address);
     void run_from_ram(int start_address);
 };

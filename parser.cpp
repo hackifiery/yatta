@@ -1,8 +1,18 @@
-#include "converter.hpp"
+#include "parser.hpp"
 #include <sstream>
 #include <stdexcept>
+#include <cstring>
 
 using namespace std;
+
+string trim(const string& str) {
+    size_t first = str.find_first_not_of(" \t\n\r");
+    if (string::npos == first) {
+        return str;
+    }
+    size_t last = str.find_last_not_of(" \t\n\r");
+    return str.substr(first, (last - first + 1));
+}
 
 RawInstruction parse_raw_instruction(const string& line) {
     // Tokenize by whitespace

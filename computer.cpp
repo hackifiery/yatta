@@ -6,6 +6,8 @@
 
 #include "cpu.hpp"
 #include "computer.hpp"
+#include "parser.hpp"
+#include "assembler.hpp"
 
 using namespace std;
 
@@ -22,7 +24,14 @@ void Computer::put_program(const vector<RawInstruction> &prog_raw, int start_add
         throw runtime_error("start_address must be >= 0");
     }
 
-    vector<Instruction> prog = decode_program(prog_raw);
+    // decode_program now returns vector<string> (machine-code lines)
+    vector<string> prog_str = decode_program(prog_raw);
+    // convert machine-code strings back into Instructions
+    vector<Instruction> prog;
+    prog.reserve(prog_str.size());
+    for (const auto &s : prog_str) {
+        prog.push_back(string_to_instr(s));
+    }
     size_t prog_count = prog.size();
     if (prog_count == 0) return;
 
@@ -33,6 +42,28 @@ void Computer::put_program(const vector<RawInstruction> &prog_raw, int start_add
     }
 
     // memcpy each Instruction into the raw byte memory at the correct byte offset
+    uint8_t* mem_ptr = memory.data();
+    for (size_t i = 0; i < prog_count; ++i) {
+        memcpy(mem_ptr + (static_cast<size_t>(start_address) + i) * instr_size,
+               &prog[i],
+               instr_size);
+    }
+}
+
+void Computer::put_program(const vector<Instruction> &prog, int start_address) {
+    if (start_address < 0) {
+        throw runtime_error("start_address must be >= 0");
+    }
+
+    size_t prog_count = prog.size();
+    if (prog_count == 0) return;
+
+    const size_t instr_size = sizeof(Instruction);
+    size_t required_bytes = (static_cast<size_t>(start_address) + prog_count) * instr_size;
+    if (required_bytes > memory.size()) {
+        throw runtime_error("Not enough memory to load program at given start_address (bytes)");
+    }
+
     uint8_t* mem_ptr = memory.data();
     for (size_t i = 0; i < prog_count; ++i) {
         memcpy(mem_ptr + (static_cast<size_t>(start_address) + i) * instr_size,

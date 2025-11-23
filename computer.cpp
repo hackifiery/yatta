@@ -1,13 +1,11 @@
 #include <iostream>
-#include <vector>
 #include <stdexcept>
 #include <cstdint>
 #include <cstring>
 
 #include "cpu.hpp"
-#include "computer.hpp"
-#include "parser.hpp"
 #include "assembler.hpp"
+#include "computer.hpp"
 
 using namespace std;
 

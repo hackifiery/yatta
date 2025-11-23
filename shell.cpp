@@ -1,32 +1,51 @@
 #include <iostream>
-#include <vector>
 #include <thread>
-#include <termios.h>
 #include <fstream>
 #include <iterator>
+#include <string>
+#include <stdexcept>
+#include <cctype>
+
+// --- OS DETECTION AND INCLUDES ---
+#if !defined(_WIN32) && !defined(_WIN64)
+#define os 1 // Unix-like systems (Linux, macOS)
 #include <unistd.h>
+#include <termios.h>
 #include <sys/select.h>
 #include <sys/time.h>
+#include <stdio.h> // for perror
+#else
+#define os 2 // Windows
+#include <windows.h> // for Sleep
+#include <conio.h>   // for _kbhit and _getch
+#endif
 
 #include "cpu.hpp"
-#include "computer.hpp"
-#include "shell.hpp"
-#include "parser.hpp"
 #include "assembler.hpp"
-
+#include "computer.hpp"
+#include "parser.hpp"
+#include "shell.hpp"
 
 using namespace std;
 
-void frontPanel(Computer& comp){
+// --- FRONT PANEL IMPLEMENTATION (Platform Specific) ---
+
+#if os == 1
+void frontPanel(Computer& comp) {
     struct termios old_settings, new_settings;
+
+    // Save current terminal settings
     if (tcgetattr(STDIN_FILENO, &old_settings) == -1) {
         perror("tcgetattr");
         return;
     }
+
+    // Set non-canonical, non-echo mode (raw input)
     new_settings = old_settings;
     new_settings.c_lflag &= ~(ICANON | ECHO);
-    new_settings.c_cc[VMIN] = 0;   // return immediately from read if no data
+    new_settings.c_cc[VMIN] = 0;    // return immediately from read if no data
     new_settings.c_cc[VTIME] = 0;
+
     if (tcsetattr(STDIN_FILENO, TCSANOW, &new_settings) == -1) {
         perror("tcsetattr");
         return;
@@ -34,17 +53,19 @@ void frontPanel(Computer& comp){
 
     bool running = true;
     while (running) {
-        // clear screen and show registers/buses
+        // Clear screen and reset cursor (POSIX ANSI escape codes)
         cout << "\033[2J\033[H";
+
         comp.cpu.print_register_file();
         cout << "\n[ BUS State ] ";
         for (int i = 0; i < comp.bus_num; ++i) {
             cout << "B" << i << "=" << comp.cpu.bus[i] << (i < comp.bus_num - 1 ? " | " : "");
         }
         cout << endl;
+        cout << "\nPress 'q' to quit front panel." << endl;
         cout.flush();
 
-        // wait for input (timeout) so the panel refreshes periodically
+        // --- Non-blocking Input with Select (POSIX) ---
         fd_set rfds;
         FD_ZERO(&rfds);
         FD_SET(STDIN_FILENO, &rfds);
@@ -54,7 +75,7 @@ void frontPanel(Computer& comp){
 
         int sel = select(STDIN_FILENO + 1, &rfds, nullptr, nullptr, &tv);
         if (sel == -1) {
-            // select error, break and restore terminal
+            // select error, break
             break;
         }
         else if (sel > 0 && FD_ISSET(STDIN_FILENO, &rfds)) {
@@ -64,24 +85,47 @@ void frontPanel(Computer& comp){
                 if (ch == 'q' || ch == 'Q') {
                     running = false;
                 }
-                // consume any extra input on line (non-blocking)
-                // optional: flush remaining bytes to avoid rapid repeats
-                while (true) {
-                    char junk;
-                    ssize_t m = read(STDIN_FILENO, &junk, 1);
-                    if (m <= 0) break;
-                }
             }
         }
         // else timeout -> loop and refresh display
     }
 
-    // restore terminal
+    // Restore terminal settings
     if (tcsetattr(STDIN_FILENO, TCSANOW, &old_settings) == -1) {
         perror("tcsetattr restore");
     }
     return;
 }
+#elif os == 2 // Windows Implementation
+void frontPanel(Computer& comp) {
+    bool running = true;
+    while (running) {
+        // Clear screen (Windows command)
+        system("cls");
+
+        comp.cpu.print_register_file();
+        cout << "\n[ BUS State ] ";
+        for (int i = 0; i < comp.bus_num; ++i) {
+            cout << "B" << i << "=" << comp.cpu.bus[i] << (i < comp.bus_num - 1 ? " | " : "");
+        }
+        cout << endl;
+        cout << "\nPress 'q' to quit front panel." << endl;
+        cout.flush();
+
+        // --- Non-blocking Input with _kbhit (Windows) ---
+        if (_kbhit()) {
+            char ch = _getch(); // Reads the character without requiring Enter
+            if (ch == 'q' || ch == 'Q') {
+                running = false;
+            }
+        }
+
+        // Delay for screen refresh (200 ms)
+        Sleep(200);
+    }
+    // No terminal state restoration needed for _kbhit/system("cls")
+}
+#endif
 
 std::vector<std::string> splitString(const std::string& s, char delimiter) {
     // helpers for parsing

@@ -2,8 +2,8 @@
 #include <cstring>
 
 #include "cpu.hpp"
-#include "parser.hpp"
 #include "assembler.hpp"
+#include "parser.hpp"
 
 using namespace std;
 
@@ -323,7 +323,7 @@ int run_prog(const vector<RawInstruction>& prog_raw) {
     return 0;
 }
 
-void test() {
+/*void test() {
     // Build program as assembly lines (human readable)
     std::vector<std::string> asm_lines = {
         "5 A1",
@@ -346,4 +346,4 @@ void test() {
     // Run program (parse->encode->decode pipeline happens inside run_prog)
     run_prog(prog_raw);
     return;
-}
+}*/

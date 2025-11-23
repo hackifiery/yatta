@@ -1,4 +1,6 @@
-#include "parser.hpp"
+#include <string>
+#include <vector>
+#include "cpu.hpp"
 #include <sstream>
 #include <stdexcept>
 #include <cstring>

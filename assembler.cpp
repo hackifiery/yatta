@@ -1,4 +1,4 @@
-#include "assembler.hpp"
+#include "cpu.hpp"
 #include "parser.hpp"
 #include <sstream>
 #include <stdexcept>
@@ -9,11 +9,9 @@ using namespace std;
 Instruction convert_line(const RawInstruction& line_raw) {
     // Initialize: source_type, source_value, dest_type, dest_value, comp[], cond1_type, cond1, cond2_type, cond2
     Instruction prog = { 0, 0, 0, 0, {0}, -1, 0, -1, 0 };
-
     // --- CONDITION PARSING ---
     if (!line_raw.condition.empty()) {
         string lhs, rhs, op;
-        
         for (int i = 0; i < 6; ++i) {
             size_t pos = line_raw.condition.find(ops_ordered[i]);
             if (pos != string::npos){

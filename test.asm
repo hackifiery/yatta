@@ -9,4 +9,4 @@ R2 A1
 R2 A2
 1 AF
 30 R3 ZF == 0
-1 HF
+; comment

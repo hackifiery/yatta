@@ -1,7 +1,5 @@
 #pragma once
 
-#include <string>
-#include <vector>
 #include "cpu.hpp"
 
 // Convert a RawInstruction into a space-delimited machine-code string

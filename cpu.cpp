@@ -133,8 +133,8 @@ bool Cpu::check_condition(const Instruction& instr) {
         }
     };
 
-    int lhs_val = compute_value(instr.cond1_type, instr.cond1_value);
-    int rhs_val = compute_value(instr.cond2_type, instr.cond2_value);
+    int lhs_val = compute_value(instr.cond1_type, instr.cond1);
+    int rhs_val = compute_value(instr.cond2_type, instr.cond2);
 
     if (strcmp(instr.comp, "eq") == 0) return lhs_val == rhs_val;
     if (strcmp(instr.comp, "ne") == 0) return lhs_val != rhs_val;

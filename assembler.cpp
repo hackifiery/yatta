@@ -7,7 +7,8 @@
 using namespace std;
 
 Instruction convert_line(const RawInstruction& line_raw) {
-    Instruction prog = { 0, 0, 0, 0, {0}, {0}, {0}, -1, -1, 0, 0 }; // zero-init + cond types/values
+    // Initialize: source_type, source_value, dest_type, dest_value, comp[], cond1_type, cond1, cond2_type, cond2
+    Instruction prog = { 0, 0, 0, 0, {0}, -1, 0, -1, 0 };
 
     // --- CONDITION PARSING ---
     if (!line_raw.condition.empty()) {
@@ -22,11 +23,7 @@ Instruction convert_line(const RawInstruction& line_raw) {
                 string lhs_trim = trim(lhs);
                 string rhs_trim = trim(rhs);
                 string comp_str = ops_map[op];
-                // copy into fixed-size fields (ensure null termination)
-                strncpy(prog.cond1, lhs_trim.c_str(), sizeof(prog.cond1)-1);
-                prog.cond1[sizeof(prog.cond1)-1] = '\0';
-                strncpy(prog.cond2, rhs_trim.c_str(), sizeof(prog.cond2)-1);
-                prog.cond2[sizeof(prog.cond2)-1] = '\0';
+                // copy comparison mnemonic into fixed-size field
                 strncpy(prog.comp, comp_str.c_str(), sizeof(prog.comp)-1);
                 prog.comp[sizeof(prog.comp)-1] = '\0';
 
@@ -64,9 +61,9 @@ Instruction convert_line(const RawInstruction& line_raw) {
                 auto p2 = parse_operand(rhs_trim);
                 // store typed operand info: both type and numeric value (mirror src/dest format)
                 prog.cond1_type = p1.first;
-                prog.cond1_value = p1.second;
+                prog.cond1 = p1.second;
                 prog.cond2_type = p2.first;
-                prog.cond2_value = p2.second;
+                prog.cond2 = p2.second;
                 break;
             }
         }
@@ -89,27 +86,24 @@ Instruction convert_line(const RawInstruction& line_raw) {
         prog.source_type = 4; // program counter
         prog.source_value = 0;
     }
-    // R# (Register)
     else if (line_raw.src[0] == 'R' && line_raw.src.size() > 1 && isdigit(line_raw.src[1])) {
-        prog.source_type = 1; // register
+        prog.source_type = 1;
         prog.source_value = stoi(line_raw.src.substr(1));
     }
-    // #F (Flag: AF, ZF, NF, OF, HF)
     else if (line_raw.src.size() > 1 && line_raw.src[1] == 'F') { 
-        prog.source_type = 3; // flag
+        prog.source_type = 3;
         prog.source_value = 0;
         switch(line_raw.src[0]) {
-            case 'A': prog.source_value = 1; break; // alu flag (trigger state)
-            case 'Z': prog.source_value = 2; break; // zero flag
-            case 'N': prog.source_value = 3; break; // neg flag
-            case 'O': prog.source_value = 4; break; // overflow flag
-            case 'H': prog.source_value = 5; break; // halt flag
+            case 'A': prog.source_value = 1; break;
+            case 'Z': prog.source_value = 2; break;
+            case 'N': prog.source_value = 3; break;
+            case 'O': prog.source_value = 4; break;
+            case 'H': prog.source_value = 5; break;
             default: throw runtime_error("unknown flag symbol '" + line_raw.src + "'");
         }
     }
-    // A# (ALU port)
     else if (line_raw.src[0] == 'A' && line_raw.src.size() > 1 && isdigit(line_raw.src[1])) {
-        prog.source_type = 2; // ALU port
+        prog.source_type = 2;
         prog.source_value = stoi(line_raw.src.substr(1));
     }
     else {
@@ -118,47 +112,33 @@ Instruction convert_line(const RawInstruction& line_raw) {
 
     // --- DESTINATION PARSING ---
     if (line_raw.dest == "PC") {
-        prog.dest_type = 4; // program counter
+        prog.dest_type = 4;
         prog.dest_value = 0;
     }
-    else if (line_raw.dest == "AF") { // Only AF can be a destination (to set the trigger)
-        prog.dest_type = 3; // ALU flag (trigger)
-        prog.dest_value = 1; // alu flag
+    else if (line_raw.dest == "AF") {
+        prog.dest_type = 3;
+        prog.dest_value = 1;
     }
-    else if (line_raw.dest == "HF") { // halt flag
-        prog.dest_type = 3; // ALU flag (trigger)
-        prog.dest_value = 5; // alu flag
+    else if (line_raw.dest == "HF") {
+        prog.dest_type = 3;
+        prog.dest_value = 5;
     }
     else if (line_raw.dest[0] == 'R' && line_raw.dest.size() > 1 && isdigit(line_raw.dest[1])) {
-        prog.dest_type = 1; // register
+        prog.dest_type = 1;
         prog.dest_value = stoi(line_raw.dest.substr(1));
     }
     else if (line_raw.dest[0] == 'A' && line_raw.dest.size() > 1 && isdigit(line_raw.dest[1])) {
-        prog.dest_type = 2; // ALU port
+        prog.dest_type = 2;
         prog.dest_value = stoi(line_raw.dest.substr(1));
     }
     else if (all_of(line_raw.dest.begin(), line_raw.dest.end(), ::isdigit) && !line_raw.dest.empty()) {
-        prog.dest_type = 0; // Discard/NOP
+        prog.dest_type = 0;
         prog.dest_value = 0;
     }
     else {
         throw runtime_error("unknown symbol '" + line_raw.dest + "' in destination");
     }
 
-    // Build a space-delimited "machine code" string. Fields:
-    // source_type source_value dest_type dest_value
-    // cond1_type cond1_value cond2_type cond2_value comp
-    /*string out =
-        to_string(prog.source_type) + " " + to_string(prog.source_value) + " " +
-        to_string(prog.dest_type) + " " + to_string(prog.dest_value);
-
-    if (prog.comp[0] != '\0') {
-        out += " " + to_string(prog.cond1_type) + " " + to_string(prog.cond1_value) +
-               " " + to_string(prog.cond2_type) + " " + to_string(prog.cond2_value) +
-               " " + string(prog.comp);
-    }
-
-    return out;*/
     return prog;
 }
 

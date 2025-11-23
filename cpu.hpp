@@ -25,17 +25,16 @@ struct Instruction {
     int source_value = 0;
     int dest_type = 0;
     int dest_value = 0;
-    // Condition fields (fixed-size C-strings so Instruction is trivially copyable)
-    char cond1[8]; // Left-hand side (usually a flag name like "ZF")
-    char cond2[8]; // Right-hand side (usually a constant like "1")
-    char comp[8];  // Comparison type (e.g., "eq" for ==)
 
-    // typed condition operands (0=const,1=reg,2=alu,3=flag,4=pc)
+    // Comparison mnemonic (fixed-size so Instruction is trivially-copyable)
+    char comp[8];  // e.g., "eq","ne","lt",...
+
+    // Typed condition operands: (type, value) pairs, same format as source/dest
+    // type: 0=const,1=reg,2=alu,3=flag,4=pc
     int cond1_type = -1;
+    int cond1 = 0; // numeric operand (mirrors source_value)
     int cond2_type = -1;
-    // numeric values for the typed condition operands (mirror source_value/dest_value)
-    int cond1_value = 0;
-    int cond2_value = 0;
+    int cond2 = 0; // numeric operand (mirrors source_value)
 };
 
 struct RawInstruction {

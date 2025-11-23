@@ -6,7 +6,7 @@
 
 using namespace std;
 
-string convert_line(const RawInstruction& line_raw) {
+Instruction convert_line(const RawInstruction& line_raw) {
     Instruction prog = { 0, 0, 0, 0, {0}, {0}, {0}, -1, -1, 0, 0 }; // zero-init + cond types/values
 
     // --- CONDITION PARSING ---
@@ -148,7 +148,7 @@ string convert_line(const RawInstruction& line_raw) {
     // Build a space-delimited "machine code" string. Fields:
     // source_type source_value dest_type dest_value
     // cond1_type cond1_value cond2_type cond2_value comp
-    string out =
+    /*string out =
         to_string(prog.source_type) + " " + to_string(prog.source_value) + " " +
         to_string(prog.dest_type) + " " + to_string(prog.dest_value);
 
@@ -158,11 +158,12 @@ string convert_line(const RawInstruction& line_raw) {
                " " + string(prog.comp);
     }
 
-    return out;
+    return out;*/
+    return prog;
 }
 
-vector<string> decode_program(const vector<RawInstruction>& prog_raw) {
-    vector<string> prog_decoded;
+vector<Instruction> decode_program(const vector<RawInstruction>& prog_raw) {
+    vector<Instruction> prog_decoded;
     prog_decoded.reserve(prog_raw.size()); 
 
     for (const auto& raw_instr : prog_raw) {
@@ -172,7 +173,9 @@ vector<string> decode_program(const vector<RawInstruction>& prog_raw) {
     return prog_decoded;
 }
 
-
+// string_to_instr used to convert a machine-code string into an Instruction.
+// Removed implementation (kept here commented for reference).
+/*
 Instruction string_to_instr(const std::string& machine_code) {
     Instruction prog = { 0, 0, 0, 0, {0}, {0}, {0}, -1, -1, 0, 0 };
 
@@ -228,3 +231,4 @@ Instruction string_to_instr(const std::string& machine_code) {
 
     return prog;
 }
+*/

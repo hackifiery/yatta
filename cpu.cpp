@@ -236,7 +236,7 @@ int Cpu::exec_line(const Instruction& instr) {
     default:
         throw runtime_error("Unknown dest type: " + to_string(instr.dest_type));
     }
-    print_register_file();
+    // DEBUG: print_register_file();
     return 0;
 }
 
@@ -308,11 +308,8 @@ int run_prog(const vector<RawInstruction>& prog_raw) {
     // DEBUG
     try {
         Cpu x = Cpu(NUM_REGISTERS_SAMPLE, BUS_COUNT_SAMPLE);
-        // decode_program returns vector<string> (machine-code lines)
-        vector<string> encoded = decode_program(prog_raw);
-        vector<Instruction> x_decoded;
-        x_decoded.reserve(encoded.size());
-        for (const auto &s : encoded) x_decoded.push_back(string_to_instr(s));
+        // decode_program now returns vector<Instruction>
+        vector<Instruction> x_decoded = decode_program(prog_raw);
         x.exec_prog(x_decoded);
     }
     catch (const runtime_error& e) {

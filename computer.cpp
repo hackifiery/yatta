@@ -24,14 +24,8 @@ void Computer::put_program(const vector<RawInstruction> &prog_raw, int start_add
         throw runtime_error("start_address must be >= 0");
     }
 
-    // decode_program now returns vector<string> (machine-code lines)
-    vector<string> prog_str = decode_program(prog_raw);
-    // convert machine-code strings back into Instructions
-    vector<Instruction> prog;
-    prog.reserve(prog_str.size());
-    for (const auto &s : prog_str) {
-        prog.push_back(string_to_instr(s));
-    }
+    // decode_program now returns vector<Instruction>
+    vector<Instruction> prog = decode_program(prog_raw);
     size_t prog_count = prog.size();
     if (prog_count == 0) return;
 

@@ -5,7 +5,6 @@
 CppProperties.json
 *.user
 *.sln
-*.vcxproj
 *.filters
 x64/
 Debug/

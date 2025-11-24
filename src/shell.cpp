@@ -54,7 +54,7 @@ void frontPanel(Computer& comp) {
     bool running = true;
     while (running) {
         // Clear screen and reset cursor (POSIX ANSI escape codes)
-        cout << "\033[2J\033[H";
+        system("clear");
 
         comp.cpu.print_register_file();
         cout << "\n[ BUS State ] ";

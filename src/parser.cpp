@@ -51,7 +51,7 @@ vector<RawInstruction> parse_program_lines(const vector<string>& lines) {
     out.reserve(lines.size());
     for (const auto& l : lines) {
         string s = trim(l);
-        if (s.empty()) continue; // skip blank lines
+        if (s.empty() || s[0] == ';') continue; // skip blank lines
         out.push_back(parse_raw_instruction(s));
     }
     return out;
